@@ -1,0 +1,23 @@
+name: Tender Bot Auto
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'  # كل 30 دقيقة
+  workflow_dispatch:  # يسمح بالتشغيل اليدوي
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Install
+        run: pip install -r requirements.txt
+      - name: Run Bot
+        env:
+          TWILIO_SID: ${{ secrets.TWILIO_SID }}
+          TWILIO_TOKEN: ${{ secrets.TWILIO_TOKEN }}
+        run: python bot.py
