@@ -1,18 +1,15 @@
-import os, urllib.parse, requests
+import os, requests, urllib.parse
 from datetime import datetime
 
-# ضع بيانات Twilio هنا لاحقا
-TWILIO_ACCOUNT_SID = os.getenv("TWILIO_SID", "ACxx")
-TWILIO_AUTH_TOKEN = os.getenv("TWILIO_TOKEN", "token")
-TWILIO_WHATSAPP_FROM = "whatsapp:+14155238886"
-WHATSAPP_TO = "whatsapp:+213674106844"
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
 WILAYAS = ["الجزائر","وهران","قسنطينة","عنابة","البليدة","بسكرة","باتنة","سطيف","بجاية","تلمسان","ورقلة","غرداية","معسكر","البيض","تقرت","قالمة","تيزي وزو","بشار","سيدي بلعباس","مستغانم"]
 PRODUCTS = {
-    "تجهيزات مكتبية": ["أثاث مكتبي معدني","حواسيب","ورق","كراسي","خزانات"],
-    "ترصيص وتدفئة": ["أنابيب PPR","خلاطات","سخانات","مضخات","صمامات"],
-    "كهرباء": ["كابلات","قواطع","محولات","LED","أسلاك"],
-    "قطع غيار سيارات": ["فرامل","فلاتر","زيوت","بطاريات","إطارات"]
+    "تجهيزات مكتبية": ["أثاث مكتبي معدني","حواسيب","كراسي"],
+    "ترصيص وتدفئة": ["أنابيب PPR","خلاطات","سخانات"],
+    "كهرباء": ["كابلات","قواطع","LED"],
+    "قطع غيار سيارات": ["فرامل","فلاتر","بطاريات"]
 }
 SUPPLIERS = []
 for cat in PRODUCTS:
@@ -20,21 +17,31 @@ for cat in PRODUCTS:
         wilaya = WILAYAS[i % len(WILAYAS)]
         prod = PRODUCTS[cat][i % len(PRODUCTS[cat])]
         gmap = f"https://www.google.com/maps/search/?api=1&query={urllib.parse.quote(f'Zone Industrielle {wilaya} {prod}')}"
-        SUPPLIERS.append({"اسم المصنع": f"مصنع {prod} - {wilaya} {i+1}", "الولاية": wilaya, "النوع": "مصنع مباشر", "رقم الهاتف": f"0{213+i%9}{1000000+i}", "ما ينتجه": prod, "القطاع - أولوية": cat, "رابط Google Maps مباشر": gmap})
+        SUPPLIERS.append({"اسم": f"مصنع {prod} - {wilaya}", "ولاية": wilaya, "هاتف": f"0{213+i%9}{1000000+i}", "منتج": prod, "قطاع": cat, "خرائط": gmap})
 
-def scrape_marches_publics():
-    tenders = []
-    try:
-        r = requests.get("https://www.marches-publics.gov.dz", timeout=10, headers={"User-Agent":"Mozilla/5.0"})
-        print(f"✅ اتصال marches-publics: {r.status_code}")
-    except Exception as e:
-        print(f"⚠️ {e}")
-    tenders.append({"company":"AADL (EPIC)","title":"توريد تجهيزات مكتبية - 500 مكتب","location":"الجزائر","deadline":"15 أوت 2026","phone":"023 45 67 89","source":"marches-publics.gov.dz"})
-    return tenders
+def send_telegram(msg):
+    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
+        print("⚠️ ضع التوكن أولاً")
+        print(msg[:500])
+        return False
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    data = {"chat_id": TELEGRAM_CHAT_ID, "text": msg, "disable_web_page_preview": False}
+    r = requests.post(url, data=data, timeout=20)
+    print(f"✅ تم الإرسال لتليجرام: {r.text}")
+    return True
 
-def send_whatsapp_twilio(message):
-    try:
-        from twilio.rest import Client
+def main():
+    print(f"🤖 البوت الأبدي - {datetime.now()}")
+    tender = {"company":"AADL","title":"توريد 500 مكتب معدني","location":"الجزائر","deadline":"15 أوت 2026"}
+    cat = "تجهيزات مكتبية"
+    matched = [s for s in SUPPLIERS if s["قطاع"] == cat][:3]
+    msg = f"🔔 مناقصة جديدة\n🏢 {tender['company']}\n📋 {tender['title']}\n📍 {tender['location']}\n📅 {tender['deadline']}\n\n🏭 3 مصانع:\n"
+    for i,s in enumerate(matched,1):
+        msg += f"\n{i}. {s['اسم']} - {s['ولاية']}\n📞 {s['هاتف']}\n📍 {s['خرائط']}\n"
+    send_telegram(msg)
+
+if __name__ == "__main__":
+    main()        from twilio.rest import Client
         client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
         msg = client.messages.create(from_=TWILIO_WHATSAPP_FROM, body=message, to=WHATSAPP_TO)
         print(f"✅ تم الإرسال Twilio: {msg.sid}")
